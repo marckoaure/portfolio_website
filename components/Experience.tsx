@@ -1,5 +1,6 @@
 import { experience } from "@/data/profile";
 import SectionLabel from "./SectionLabel";
+import Reveal from "./Reveal";
 
 export default function Experience() {
   return (
@@ -8,12 +9,14 @@ export default function Experience() {
       className="px-6 sm:px-10 lg:px-20 py-24 sm:py-32 border-t border-line"
     >
       <div className="mx-auto w-full max-w-6xl">
-        <SectionLabel>Experience</SectionLabel>
+        <Reveal>
+          <SectionLabel>Experience</SectionLabel>
+        </Reveal>
 
         <div className="divide-y divide-line">
-          {experience.map((job) => (
+          {experience.map((job, i) => (
+            <Reveal key={`${job.role}-${job.company}`} delay={i * 80}>
             <article
-              key={`${job.role}-${job.company}`}
               className="grid gap-4 py-10 sm:grid-cols-[12rem_1fr] sm:gap-10"
             >
               {/* Date range (+ hours, if any) */}
@@ -43,6 +46,7 @@ export default function Experience() {
                 </ul>
               </div>
             </article>
+            </Reveal>
           ))}
         </div>
       </div>

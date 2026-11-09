@@ -1,5 +1,6 @@
 import SectionLabel from "./SectionLabel";
 import Handshake from "./Handshake";
+import Reveal from "./Reveal";
 
 export default function BumpMe() {
   return (
@@ -8,11 +9,13 @@ export default function BumpMe() {
       className="px-6 sm:px-10 lg:px-20 py-24 sm:py-32 border-t border-line"
     >
       <div className="mx-auto w-full max-w-6xl">
-        <SectionLabel>Bump Me</SectionLabel>
+        <Reveal>
+          <SectionLabel>Bump Me</SectionLabel>
+        </Reveal>
 
-        <div className="mt-8">
+        <Reveal delay={80} className="mt-8">
           <Handshake />
-        </div>
+        </Reveal>
       </div>
     </section>
   );

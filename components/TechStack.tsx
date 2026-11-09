@@ -20,6 +20,7 @@ import {
 } from "react-icons/si";
 import SectionLabel from "./SectionLabel";
 import LogoLoop, { type LogoItem } from "./LogoLoop";
+import Reveal from "./Reveal";
 
 // Small text "logo" for technologies without a brand icon.
 function TextLogo({ label }: { label: string }) {
@@ -91,25 +92,33 @@ export default function TechStack() {
       className="px-6 sm:px-10 lg:px-20 py-24 sm:py-32 border-t border-line"
     >
       <div className="mx-auto w-full max-w-6xl">
-        <SectionLabel>Tech Stack</SectionLabel>
-
-        <p className="max-w-xl text-lg text-subtle">
-          Technologies I&apos;ve worked with across software and hardware
-          projects.
-        </p>
+        <Reveal>
+          <SectionLabel>Tech Stack</SectionLabel>
+          <p className="max-w-xl text-lg text-subtle">
+            Technologies I&apos;ve worked with across software and hardware
+            projects.
+          </p>
+        </Reveal>
 
         <div className="mt-14 space-y-10">
-          <LogoLoop logos={row1} direction="left" speed={55} ariaLabel="Languages" />
-          <LogoLoop
-            logos={row2}
-            direction="right"
-            speed={50}
-            ariaLabel="Frameworks and libraries"
-          />
-          <LogoLoop logos={row3} direction="left" speed={45} ariaLabel="Tools and databases" />
+          <Reveal>
+            <LogoLoop logos={row1} direction="left" speed={55} ariaLabel="Languages" />
+          </Reveal>
+          <Reveal delay={70}>
+            <LogoLoop
+              logos={row2}
+              direction="right"
+              speed={50}
+              ariaLabel="Frameworks and libraries"
+            />
+          </Reveal>
+          <Reveal delay={140}>
+            <LogoLoop logos={row3} direction="left" speed={45} ariaLabel="Tools and databases" />
+          </Reveal>
         </div>
 
         {/* Core competencies (no logos) */}
+        <Reveal>
         <p className="mt-14 text-sm leading-relaxed text-faint">
           <span className="font-mono uppercase tracking-widest text-muted">
             Also
@@ -118,6 +127,7 @@ export default function TechStack() {
           Learning &middot; Digital Logic Design &middot; Embedded Systems
           &middot; Data Analytics
         </p>
+        </Reveal>
       </div>
     </section>
   );

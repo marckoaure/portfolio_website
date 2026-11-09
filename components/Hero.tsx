@@ -1,6 +1,13 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { useRef } from "react";
+import {
+  motion,
+  useMotionTemplate,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from "motion/react";
 import { profile } from "@/data/profile";
 import { useIntroDone } from "./IntroProvider";
 import Clock from "./Clock";
@@ -33,8 +40,31 @@ export default function Hero() {
   // true once the preloader's curtain starts lifting — our cue to animate in.
   const introDone = useIntroDone();
 
+  // Parallax on scroll: as the hero leaves the top of the viewport, its
+  // content drifts down a little and fades, so the hand-off to About is a
+  // dissolve instead of a hard cut. scrollYProgress is 0 while the hero is
+  // at the top and 1 when its bottom edge reaches the top of the screen.
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+  // Function form on purpose: Motion 13 "accelerates" range-based transforms
+  // of scroll values into native scroll-driven animations, which did not
+  // update opacity here. Plain functions stay on the JS path that works.
+  const drift = useTransform(scrollYProgress, (p) => (reduce ? 0 : p * 80));
+  const contentTransform = useMotionTemplate`translateY(${drift}px)`;
+  const contentOpacity = useTransform(scrollYProgress, (p) =>
+    Math.max(0, 1 - p / 0.65)
+  );
+  // The scroll cue has done its job after the first bit of scrolling.
+  const cueOpacity = useTransform(scrollYProgress, (p) =>
+    Math.max(0, 1 - p / 0.12)
+  );
+
   return (
     <section
+      ref={sectionRef}
       id="home"
       className="relative min-h-[100svh] flex flex-col justify-center px-6 sm:px-10 lg:px-20 overflow-hidden"
     >
@@ -42,6 +72,9 @@ export default function Hero() {
 
       <motion.div
         className="relative z-10 mx-auto w-full max-w-6xl"
+        style={{ transform: contentTransform, opacity: contentOpacity }}
+      >
+      <motion.div
         variants={{
           hidden: {
             opacity: 0,
@@ -126,11 +159,25 @@ export default function Hero() {
           </a>
         </div>
       </motion.div>
+      </motion.div>
 
-      {/* Scroll cue */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-[0.3em] uppercase text-faint">
-        Scroll ↓
-      </div>
+      {/* Scroll cue: bobs gently, fades out once the visitor starts scrolling */}
+      <motion.div
+        aria-hidden
+        className="absolute bottom-8 left-1/2 -translate-x-1/2"
+        style={{ opacity: cueOpacity }}
+      >
+        <span
+          className="block font-mono text-[10px] tracking-[0.3em] uppercase text-faint"
+          style={{
+            animation: reduce
+              ? undefined
+              : "scroll-cue 1.8s cubic-bezier(0.77, 0, 0.175, 1) infinite",
+          }}
+        >
+          Scroll ↓
+        </span>
+      </motion.div>
     </section>
   );
 }

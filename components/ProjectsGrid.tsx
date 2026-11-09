@@ -23,7 +23,9 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 2-up on phones so a card is a glance, not a whole screen; wraps
+          naturally as more projects are added. */}
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
         {projects.map((p) => (
           <TiltedCard
             key={p.num}
@@ -41,18 +43,18 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
               ) : (
                 // Placeholder until a screenshot is uploaded in Sanity.
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-line to-bg">
-                  <span className="font-mono text-7xl font-bold text-faint2 opacity-40">
+                  <span className="font-mono text-5xl sm:text-7xl font-bold text-faint2 opacity-40">
                     {p.num}
                   </span>
                 </div>
               )}
 
               {/* Title bar, popped forward for a 3D feel */}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-4 [transform:translateZ(30px)]">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3 sm:p-4 [transform:translateZ(30px)]">
                 <div className="font-mono text-[10px] tracking-widest uppercase text-white/70">
                   {p.num} · {p.year}
                 </div>
-                <div className="mt-1 text-sm font-semibold text-white line-clamp-2">
+                <div className="mt-1 text-xs sm:text-sm font-semibold text-white line-clamp-2">
                   {p.title}
                 </div>
               </div>

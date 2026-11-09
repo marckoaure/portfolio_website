@@ -6,6 +6,7 @@ import { profile } from "@/data/profile";
 import SectionLabel from "./SectionLabel";
 import StatCounter from "./StatCounter";
 import TextType from "./TextType";
+import Reveal from "./Reveal";
 
 export default function About() {
   const bioText = profile.bio.join(" ");
@@ -34,8 +35,11 @@ export default function About() {
       className="px-6 sm:px-10 lg:px-20 py-24 sm:py-32 border-t border-line"
     >
       <div className="mx-auto w-full max-w-6xl">
-        <SectionLabel>About</SectionLabel>
+        <Reveal>
+          <SectionLabel>About</SectionLabel>
+        </Reveal>
 
+        <Reveal delay={80}>
         <div className="grid gap-12 lg:grid-cols-[1fr_auto] lg:gap-20 items-start">
           {/* Bio — hidden until hovered (or scrolled to on touch) */}
           <div
@@ -96,16 +100,18 @@ export default function About() {
             </div>
           </div>
         </div>
+        </Reveal>
 
-        {/* Animated stat counters */}
+        {/* Animated stat counters, staggered in left to right */}
         <div className="mt-20 grid grid-cols-3 gap-6 border-t border-line pt-12">
-          {profile.stats.map((stat) => (
-            <StatCounter
-              key={stat.label}
-              value={stat.value}
-              suffix={stat.suffix}
-              label={stat.label}
-            />
+          {profile.stats.map((stat, i) => (
+            <Reveal key={stat.label} delay={i * 70}>
+              <StatCounter
+                value={stat.value}
+                suffix={stat.suffix}
+                label={stat.label}
+              />
+            </Reveal>
           ))}
         </div>
       </div>

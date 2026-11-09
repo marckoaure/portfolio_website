@@ -2,17 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import LineSidebar from "./LineSidebar";
-
-// Each nav item points at a section's id on the page.
-const SECTIONS = [
-  { label: "Home", id: "home" },
-  { label: "About", id: "about" },
-  { label: "Projects", id: "projects" },
-  { label: "Experience", id: "experience" },
-  { label: "Tech Stack", id: "tech" },
-  { label: "Contact", id: "contact" },
-  { label: "Bump Me", id: "bump" },
-];
+import { SECTIONS } from "@/data/sections";
 
 export default function SideNav() {
   const [active, setActive] = useState(0);

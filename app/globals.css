@@ -27,6 +27,11 @@
   --line: #262626;
   --strong: #ffffff;
   color-scheme: dark;
+
+  /* Motion tokens. Built-in CSS easings are too weak; these are the strong
+     curves every transition/animation on the site shares. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 /* LIGHT theme: same visual hierarchy, inverted. */
@@ -53,6 +58,41 @@ body {
   color: var(--fg);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard focus ring (mouse clicks don't show it thanks to :focus-visible). */
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ---------- Scroll reveal (components/Reveal.tsx) ---------- */
+/* Hidden + 16px low until the element scrolls into view, then it rises and
+   fades in once. transform/opacity only, strong ease-out, under the 600ms
+   ceiling for marketing motion. The visible state is `transform: none` so
+   fixed-position children inside are not trapped after the reveal. */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 500ms var(--ease-out),
+    transform 500ms var(--ease-out);
+}
+.reveal[data-visible] {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Hero scroll cue ---------- */
+@keyframes scroll-cue {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
 }
 
 ::selection {
@@ -130,6 +170,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  /* Reveal becomes a plain fade: no positional movement. */
+  .reveal {
+    transform: none;
   }
   *,
   *::before,

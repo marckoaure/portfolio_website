@@ -1,5 +1,6 @@
 import ProjectsGrid from "./ProjectsGrid";
 import CertFolder from "./CertFolder";
+import Reveal from "./Reveal";
 import { fetchProjects } from "@/sanity/fetchProjects";
 
 export default async function Projects() {
@@ -12,6 +13,7 @@ export default async function Projects() {
     >
       <div className="mx-auto w-full max-w-6xl">
         {/* Header: label + line + the certifications folder */}
+        <Reveal>
         <div className="mb-8 flex items-center gap-4">
           <span className="whitespace-nowrap font-mono text-xs uppercase tracking-[0.25em] text-muted">
             Projects &amp; Certifications
@@ -19,20 +21,25 @@ export default async function Projects() {
           <span className="h-px flex-1 bg-line" />
           <CertFolder />
         </div>
+        </Reveal>
 
-        <p className="max-w-xl text-lg text-subtle">
-          A curated collection of things I&apos;ve built and researched — growing
-          over time. Hover to tilt, click for details, or open the folder above
-          for my certifications.
-        </p>
+        <Reveal delay={60}>
+          <p className="max-w-xl text-lg text-subtle">
+            A curated collection of things I&apos;ve built and researched — growing
+            over time. Hover to tilt, click for details, or open the folder above
+            for my certifications.
+          </p>
+        </Reveal>
 
-        <div className="mt-10">
+        <Reveal delay={120} className="mt-10">
           <ProjectsGrid projects={projects} />
-        </div>
+        </Reveal>
 
-        <p className="mt-12 font-mono text-xs tracking-widest uppercase text-faint">
-          More projects coming soon…
-        </p>
+        <Reveal>
+          <p className="mt-12 font-mono text-xs tracking-widest uppercase text-faint">
+            More projects coming soon…
+          </p>
+        </Reveal>
       </div>
     </section>
   );

@@ -3,6 +3,9 @@
 // -----------------------------------------------------------------------------
 
 export const profile = {
+  // Public URL of the deployed site (used for Open Graph, sitemap, robots).
+  siteUrl: "https://marckoaure.vercel.app",
+
   firstName: "Gianne Marcko",
   lastName: "Aure",
   fullName: "Gianne Marcko G. Aure",
