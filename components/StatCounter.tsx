@@ -50,7 +50,7 @@ export default function StatCounter({
         {count}
         {suffix}
       </span>
-      <span className="mt-2 font-mono text-xs tracking-[0.2em] text-[#8a8a8a] uppercase">
+      <span className="mt-2 font-mono text-xs tracking-[0.2em] text-muted uppercase">
         {label}
       </span>
     </div>

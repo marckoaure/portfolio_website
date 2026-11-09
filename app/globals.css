@@ -1,45 +1,129 @@
 @import "tailwindcss";
 
+/* Map Tailwind color utilities (bg-bg, text-fg, border-line, ...) onto CSS
+   variables. `inline` emits the var() reference so the color resolves at
+   runtime and flips when the theme changes. */
 @theme inline {
-  --color-bg: #0a0a0a;
-  --color-fg: #ededed;
-  --color-muted: #8a8a8a;
-  --color-line: #262626;
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-subtle: var(--subtle);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-faint2: var(--faint2);
+  --color-line: var(--line);
+  --color-strong: var(--strong);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/* DARK is the default theme (no data-theme attribute needed). */
+:root {
+  --bg: #0a0a0a;
+  --fg: #ededed;
+  --subtle: #b5b5b5;
+  --muted: #8a8a8a;
+  --faint: #5a5a5a;
+  --faint2: #3a3a3a;
+  --line: #262626;
+  --strong: #ffffff;
+  color-scheme: dark;
+}
+
+/* LIGHT theme: same visual hierarchy, inverted. */
+:root[data-theme="light"] {
+  --bg: #fafafa;
+  --fg: #141414;
+  --subtle: #3d3d3d;
+  --muted: #6b6b6b;
+  --faint: #a0a0a0;
+  --faint2: #cfcfcf;
+  --line: #e6e6e6;
+  --strong: #000000;
+  color-scheme: light;
+}
+
 html {
   scroll-behavior: smooth;
-  background: #0a0a0a;
-  color: #ededed;
+  background: var(--bg);
+  color: var(--fg);
 }
 
 body {
-  background: #0a0a0a;
-  color: #ededed;
+  background: var(--bg);
+  color: var(--fg);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Thin dark scrollbar to match the aesthetic */
+::selection {
+  background: var(--fg);
+  color: var(--bg);
+}
+
 ::-webkit-scrollbar {
   width: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: var(--bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #262626;
+  background: var(--line);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: var(--faint);
 }
 
-::selection {
-  background: #ededed;
-  color: #0a0a0a;
+/* ---------- Sword theme transition ---------- */
+/* The panel is painted as the OLD background and peels away along a diagonal,
+   uncovering the freshly-themed page behind it. */
+@keyframes sword-panel {
+  from {
+    clip-path: polygon(0% 0, 100% 0, 100% 100%, -45% 100%);
+  }
+  to {
+    clip-path: polygon(190% 0, 100% 0, 100% 100%, 145% 100%);
+  }
+}
+/* The bright blade that leads the peel across the screen. */
+@keyframes sword-blade {
+  from {
+    transform: translateX(-12vw) skewX(-24deg);
+  }
+  to {
+    transform: translateX(118vw) skewX(-24deg);
+  }
+}
+
+/* Blinking caret for the typing effect */
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- Logo loop marquee ---------- */
+@keyframes logoloop-left {
+  to {
+    transform: translateX(calc(-1 * var(--logoloop-width, 0px)));
+  }
+}
+@keyframes logoloop-right {
+  from {
+    transform: translateX(calc(-1 * var(--logoloop-width, 0px)));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+/* Pause the scroll while hovering the row */
+.logoloop-pause:hover .logoloop-track {
+  animation-play-state: paused;
 }
 
 /* Respect users who prefer reduced motion */

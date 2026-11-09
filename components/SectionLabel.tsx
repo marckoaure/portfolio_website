@@ -3,10 +3,10 @@
 export default function SectionLabel({ children }: { children: string }) {
   return (
     <div className="flex items-center gap-3 mb-8">
-      <span className="font-mono text-xs tracking-[0.25em] text-[#8a8a8a] uppercase">
+      <span className="font-mono text-xs tracking-[0.25em] text-muted uppercase">
         {children}
       </span>
-      <span className="h-px flex-1 bg-[#262626]" />
+      <span className="h-px flex-1 bg-line" />
     </div>
   );
 }
