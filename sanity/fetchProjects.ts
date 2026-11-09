@@ -17,6 +17,9 @@ type SanityRow = {
 // Fetch projects from Sanity. If Sanity is empty, misconfigured, or
 // unreachable, fall back to the static list so the section never breaks.
 export async function fetchProjects(): Promise<Project[]> {
+  // No Sanity config at all (env vars missing): use the static list.
+  if (!sanityClient) return fallbackProjects;
+
   try {
     const rows = await sanityClient.fetch<SanityRow[]>(
       projectsQuery,
