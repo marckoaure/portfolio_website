@@ -10,6 +10,30 @@ import TechStack from "@/components/TechStack";
 import Contact from "@/components/Contact";
 import BumpMe from "@/components/BumpMe";
 import Footer from "@/components/Footer";
+import { profile } from "@/data/profile";
+
+// Structured data: tells search engines this page is about a person and
+// which profiles belong to them (can show as a richer search result).
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: profile.fullName,
+  url: profile.siteUrl,
+  image: `${profile.siteUrl}${profile.headshot}`,
+  jobTitle: profile.role,
+  description: profile.tagline,
+  affiliation: {
+    "@type": "CollegeOrUniversity",
+    name: "Cavite State University",
+  },
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Tagaytay City",
+    addressRegion: "Cavite",
+    addressCountry: "PH",
+  },
+  sameAs: [profile.github, profile.linkedin, profile.facebook],
+};
 
 export default function Home() {
   return (
@@ -17,7 +41,11 @@ export default function Home() {
       <ScrollProgress />
       <SideNav />
       <MobileNav />
-      <main className="flex-1">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <main id="main" className="flex-1">
         <Hero />
         <About />
         <Projects />

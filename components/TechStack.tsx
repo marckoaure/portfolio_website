@@ -93,7 +93,7 @@ export default function TechStack() {
     >
       <div className="mx-auto w-full max-w-6xl">
         <Reveal>
-          <SectionLabel>Tech Stack</SectionLabel>
+          <SectionLabel as="h2">Tech Stack</SectionLabel>
           <p className="max-w-xl text-lg text-subtle">
             Technologies I&apos;ve worked with across software and hardware
             projects.

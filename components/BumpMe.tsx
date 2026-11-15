@@ -10,7 +10,7 @@ export default function BumpMe() {
     >
       <div className="mx-auto w-full max-w-6xl">
         <Reveal>
-          <SectionLabel>Bump Me</SectionLabel>
+          <SectionLabel as="h2">Bump Me</SectionLabel>
         </Reveal>
 
         <Reveal delay={80} className="mt-8">

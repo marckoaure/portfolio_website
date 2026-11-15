@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { SECTIONS } from "@/data/sections";
+import { useDialogFocus } from "@/lib/useDialogFocus";
 
 // Phone/tablet navigation (the LineSidebar is desktop-only). A round button
 // mirrors the theme toggle on the other side; it opens a full-screen list of
@@ -10,6 +11,8 @@ import { SECTIONS } from "@/data/sections";
 export default function MobileNav() {
   const [open, setOpen] = useState(false);
   const reduce = useReducedMotion();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, open);
 
   // Lock page scroll + close on Escape while the menu is open.
   useEffect(() => {
@@ -43,7 +46,7 @@ export default function MobileNav() {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className="fixed left-5 top-5 z-[60] flex h-10 w-10 items-center justify-center rounded-full border border-line bg-bg text-fg transition-colors hover:border-fg"
+        className="press fixed left-5 top-5 z-[60] flex h-10 w-10 items-center justify-center rounded-full border border-line bg-bg text-fg hover:border-fg"
       >
         <svg
           width="18"
@@ -62,7 +65,9 @@ export default function MobileNav() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed inset-0 z-[85] flex flex-col bg-bg px-6 pb-10 pt-24 sm:px-10"
+            ref={dialogRef}
+            tabIndex={-1}
+            className="fixed inset-0 z-[85] flex flex-col bg-bg px-6 pb-10 pt-24 outline-none sm:px-10"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -75,7 +80,7 @@ export default function MobileNav() {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close menu"
-              className="fixed right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-bg text-fg transition-colors hover:border-fg"
+              className="press fixed right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-line bg-bg text-fg hover:border-fg"
             >
               <svg
                 width="18"

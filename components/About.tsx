@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import Image from "next/image";
+import { useInView } from "motion/react";
 import { profile } from "@/data/profile";
 import SectionLabel from "./SectionLabel";
 import StatCounter from "./StatCounter";
@@ -10,24 +11,12 @@ import Reveal from "./Reveal";
 
 export default function About() {
   const bioText = profile.bio.join(" ");
-  const [started, setStarted] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const bioRef = useRef<HTMLDivElement>(null);
 
-  // Desktop reveals on hover. Touch devices have no hover, so there we
-  // reveal when the section scrolls into view instead.
-  useEffect(() => {
-    const canHover = window.matchMedia("(hover: hover)").matches;
-    if (canHover) return;
-
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => entry.isIntersecting && setStarted(true),
-      { threshold: 0.3 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  // The bio types itself out the first time about a third of it is on screen.
+  // It used to wait for a mouse hover, which hid the text from anyone who did
+  // not think to hover (and from every keyboard user).
+  const started = useInView(bioRef, { once: true, amount: 0.3 });
 
   return (
     <section
@@ -39,18 +28,13 @@ export default function About() {
           <SectionLabel>About</SectionLabel>
         </Reveal>
 
-        <Reveal delay={80}>
         <div className="grid gap-12 lg:grid-cols-[1fr_auto] lg:gap-20 items-start">
-          {/* Bio — hidden until hovered (or scrolled to on touch) */}
-          <div
-            ref={ref}
-            onMouseEnter={() => setStarted(true)}
-            onMouseLeave={() => setStarted(false)}
-            className="group max-w-2xl"
-          >
-            <h2 className="text-3xl sm:text-5xl font-semibold tracking-tight text-fg transition-colors">
-              About Me
-            </h2>
+          <div ref={bioRef} className="max-w-2xl">
+            <Reveal variant="clip">
+              <h2 className="text-3xl sm:text-5xl font-semibold tracking-tight text-fg">
+                About Me
+              </h2>
+            </Reveal>
 
             {/* An invisible copy reserves the space (so nothing jumps as the
                 text types) and carries the real text for screen readers / SEO. */}
@@ -58,10 +42,10 @@ export default function About() {
               <p className="opacity-0 select-none">{bioText}</p>
 
               <div className="absolute inset-0 text-fg" aria-hidden="true">
-                {started ? (
+                {started && (
                   <TextType
                     text={bioText}
-                    typingSpeed={18}
+                    typingSpeed={10}
                     loop={false}
                     showCursor
                     cursorCharacter="_"
@@ -69,38 +53,24 @@ export default function About() {
                     className="text-fg"
                     cursorClassName="text-muted"
                   />
-                ) : (
-                  <span className="font-mono text-sm tracking-widest uppercase text-faint">
-                    Hover to read
-                    <span
-                      className="ml-1 text-muted"
-                      style={{
-                        animation: "caret-blink 0.6s linear infinite",
-                      }}
-                    >
-                      _
-                    </span>
-                  </span>
                 )}
               </div>
             </div>
           </div>
 
           {/* Photo */}
-          <div className="order-first lg:order-none">
-            <div className="relative h-40 w-40 sm:h-52 sm:w-52 overflow-hidden rounded-2xl border border-line grayscale">
+          <Reveal delay={80} className="order-first lg:order-none">
+            <div className="relative h-40 w-40 sm:h-52 sm:w-52 overflow-hidden rounded-2xl border border-line grayscale transition-[filter] duration-500 hover:grayscale-0">
               <Image
                 src={profile.headshot}
                 alt={profile.fullName}
                 fill
                 sizes="208px"
                 className="object-cover"
-                priority
               />
             </div>
-          </div>
+          </Reveal>
         </div>
-        </Reveal>
 
         {/* Animated stat counters, staggered in left to right */}
         <div className="mt-20 grid grid-cols-3 gap-6 border-t border-line pt-12">

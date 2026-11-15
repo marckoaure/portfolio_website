@@ -31,8 +31,11 @@ export default function TiltedCard({
   const rotateY = useSpring(useMotionValue(0), spring);
   const scale = useSpring(1, spring);
 
-  function onMove(e: React.MouseEvent<HTMLDivElement>) {
-    if (reduce || !ref.current) return;
+  // Pointer events instead of mouse events so we can tell a real mouse from a
+  // finger: a tap on a phone also fires "mouse enter", which used to leave the
+  // card stuck tilted and enlarged until the next tap somewhere else.
+  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (reduce || !ref.current || e.pointerType !== "mouse") return;
     const rect = ref.current.getBoundingClientRect();
     const offsetX = e.clientX - rect.left - rect.width / 2;
     const offsetY = e.clientY - rect.top - rect.height / 2;
@@ -40,8 +43,8 @@ export default function TiltedCard({
     rotateY.set((offsetX / (rect.width / 2)) * rotateAmplitude);
   }
 
-  function onEnter() {
-    if (!reduce) scale.set(scaleOnHover);
+  function onEnter(e: React.PointerEvent<HTMLDivElement>) {
+    if (!reduce && e.pointerType === "mouse") scale.set(scaleOnHover);
   }
 
   function onLeave() {
@@ -54,9 +57,9 @@ export default function TiltedCard({
     <div
       ref={ref}
       className="[perspective:900px]"
-      onMouseMove={onMove}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
+      onPointerMove={onMove}
+      onPointerEnter={onEnter}
+      onPointerLeave={onLeave}
     >
       <motion.button
         type="button"

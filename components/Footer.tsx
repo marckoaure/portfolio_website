@@ -17,11 +17,11 @@ export default function Footer() {
             href={profile.resume}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted hover:text-fg"
+            className="link-u text-muted transition-colors hover:text-fg"
           >
             Resume ↗
           </a>
-          <a href="#home" className="text-muted hover:text-fg">
+          <a href="#home" className="link-u text-muted transition-colors hover:text-fg">
             Back to top ↑
           </a>
         </div>

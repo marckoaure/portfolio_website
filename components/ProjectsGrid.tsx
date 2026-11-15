@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Project } from "@/data/projects";
 import TiltedCard from "./TiltedCard";
+import Reveal from "./Reveal";
+import { useDialogFocus } from "@/lib/useDialogFocus";
+import { sized } from "@/lib/sanityImage";
 
 export default function ProjectsGrid({ projects }: { projects: Project[] }) {
   const [active, setActive] = useState<Project | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Keyboard users: focus moves into the popup, stays there, and returns to
+  // the card that opened it.
+  useDialogFocus(dialogRef, active !== null);
 
   // Lock scroll + close on Escape while the detail popup is open.
   useEffect(() => {
@@ -26,18 +33,22 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
       {/* 2-up on phones so a card is a glance, not a whole screen; wraps
           naturally as more projects are added. */}
       <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-        {projects.map((p) => (
+        {projects.map((p, i) => (
+          // Each card reveals on its own; the delay restarts every 4 cards so
+          // a long list never makes the last card wait.
+          <Reveal key={p.num} delay={(i % 4) * 70}>
           <TiltedCard
-            key={p.num}
             onClick={() => setActive(p)}
-            className="rounded-2xl"
+            className="group rounded-2xl"
           >
-            <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-line">
+            <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-line transition-colors duration-200 group-hover:border-faint">
               {p.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={p.image}
+                  src={sized(p.image, 800)}
                   alt={p.title}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -57,9 +68,16 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                 <div className="mt-1 text-xs sm:text-sm font-semibold text-white line-clamp-2">
                   {p.title}
                 </div>
+                {/* Affordance: says the card is clickable. Slides in on hover
+                    or keyboard focus; always shown on touch screens, which
+                    have no hover. */}
+                <div className="mt-2 translate-y-1 font-mono text-[10px] uppercase tracking-widest text-white/80 opacity-0 transition-[opacity,translate] duration-200 ease-strong group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:opacity-100">
+                  View details →
+                </div>
               </div>
             </div>
           </TiltedCard>
+          </Reveal>
         ))}
       </div>
 
@@ -73,9 +91,14 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={() => setActive(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={active.title}
           >
             <motion.div
-              className="relative max-h-[85vh] w-full max-w-lg overflow-auto rounded-2xl border border-line bg-bg p-6 sm:p-8"
+              ref={dialogRef}
+              tabIndex={-1}
+              className="relative max-h-[85vh] w-full max-w-lg overflow-auto rounded-2xl border border-line bg-bg p-6 outline-none sm:p-8"
               initial={{ opacity: 0, transform: "scale(0.95)" }}
               animate={{ opacity: 1, transform: "scale(1)" }}
               exit={{ opacity: 0, transform: "scale(0.96)" }}
@@ -86,7 +109,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                 type="button"
                 onClick={() => setActive(null)}
                 aria-label="Close"
-                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-fg hover:text-fg"
+                className="press absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted hover:border-fg hover:text-fg"
               >
                 ×
               </button>
@@ -94,7 +117,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
               {active.image && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={active.image}
+                  src={sized(active.image, 1200)}
                   alt={active.title}
                   className="mb-6 w-full rounded-xl object-cover"
                 />
@@ -131,7 +154,7 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                     href={active.live}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-fg underline-offset-4 hover:underline"
+                    className="link-u text-fg"
                   >
                     Live ↗
                   </a>
@@ -141,13 +164,10 @@ export default function ProjectsGrid({ projects }: { projects: Project[] }) {
                     href={active.github}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-fg underline-offset-4 hover:underline"
+                    className="link-u text-fg"
                   >
                     Code ↗
                   </a>
-                )}
-                {!active.live && !active.github && (
-                  <span className="text-faint">Details coming soon</span>
                 )}
               </div>
             </motion.div>

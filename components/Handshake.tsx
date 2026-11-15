@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useDialogFocus } from "@/lib/useDialogFocus";
 
 const VIDEO_SRC =
   "/spider-man-homecoming-handshake-peter-and-ned-handshake.mp4";
@@ -67,6 +68,8 @@ export default function Handshake() {
   const [live, setLive] = useState<number | null>(null); // null = not fetched yet
   const count = live ?? cached;
   const videoRef = useRef<HTMLVideoElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, open);
   const reduce = useReducedMotion();
 
   // Fetch the global bump total on mount. Until it arrives, `count` shows the
@@ -150,7 +153,7 @@ export default function Handshake() {
       <button
         type="button"
         onClick={bump}
-        className="mt-6 inline-flex items-center gap-2 rounded-full border border-fg bg-fg px-8 py-4 text-base font-medium text-bg transition-colors hover:bg-transparent hover:text-fg"
+        className="press mt-6 inline-flex items-center gap-2 rounded-full border border-fg bg-fg px-8 py-4 text-base font-medium text-bg hover:bg-transparent hover:text-fg"
       >
         Bump me <span aria-hidden></span>
       </button>
@@ -169,9 +172,14 @@ export default function Handshake() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={startClose}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Handshake video"
           >
             <motion.div
-              className="relative w-full max-w-lg"
+              ref={dialogRef}
+              tabIndex={-1}
+              className="relative w-full max-w-lg outline-none"
               initial={{ opacity: 0, scale: reduce ? 1 : 0.94 }}
               animate={
                 closing

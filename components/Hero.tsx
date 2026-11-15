@@ -1,17 +1,22 @@
 "use client";
 
 import { useRef } from "react";
+import dynamic from "next/dynamic";
 import {
   motion,
   useMotionTemplate,
   useReducedMotion,
   useScroll,
   useTransform,
+  type Variants,
 } from "motion/react";
 import { profile } from "@/data/profile";
 import { useIntroDone } from "./IntroProvider";
 import Clock from "./Clock";
-import ThreeHero from "./ThreeHero";
+
+// Three.js is the heaviest thing on the page and purely decorative, so it is
+// split into its own bundle and fetched after the hero text is already up.
+const ThreeHero = dynamic(() => import("./ThreeHero"), { ssr: false });
 
 // Social links shown under the name. Each `path` is a single SVG icon path.
 const SOCIALS = [
@@ -34,7 +39,7 @@ const SOCIALS = [
 
 export default function Hero() {
   // true when the visitor has asked their OS to minimize motion.
-  // In that case we skip the upward slide and keep only a gentle fade.
+  // In that case we skip the movement and keep only gentle fades.
   const reduce = useReducedMotion();
 
   // true once the preloader's curtain starts lifting — our cue to animate in.
@@ -49,9 +54,6 @@ export default function Hero() {
     target: sectionRef,
     offset: ["start start", "end start"],
   });
-  // Function form on purpose: Motion 13 "accelerates" range-based transforms
-  // of scroll values into native scroll-driven animations, which did not
-  // update opacity here. Plain functions stay on the JS path that works.
   const drift = useTransform(scrollYProgress, (p) => (reduce ? 0 : p * 80));
   const contentTransform = useMotionTemplate`translateY(${drift}px)`;
   const contentOpacity = useTransform(scrollYProgress, (p) =>
@@ -61,6 +63,37 @@ export default function Hero() {
   const cueOpacity = useTransform(scrollYProgress, (p) =>
     Math.max(0, 1 - p / 0.12)
   );
+
+  // Entrance choreography. The container only hands out timing: each child
+  // starts 70ms after the previous one, so the eye is led top to bottom
+  // instead of everything landing at once.
+  const container: Variants = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
+  };
+  // Supporting content: fade + 16px rise.
+  const item: Variants = {
+    hidden: {
+      opacity: 0,
+      transform: reduce ? "translateY(0px)" : "translateY(16px)",
+    },
+    show: {
+      opacity: 1,
+      transform: "translateY(0px)",
+      transition: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
+    },
+  };
+  // The name: each line rises out from behind a mask (its wrapper clips it).
+  const nameLine: Variants = {
+    hidden: reduce
+      ? { opacity: 0, transform: "translateY(0%)" }
+      : { opacity: 1, transform: "translateY(105%)" },
+    show: {
+      opacity: 1,
+      transform: "translateY(0%)",
+      transition: { duration: 0.7, ease: [0.23, 1, 0.32, 1] },
+    },
+  };
 
   return (
     <section
@@ -74,91 +107,109 @@ export default function Hero() {
         className="relative z-10 mx-auto w-full max-w-6xl"
         style={{ transform: contentTransform, opacity: contentOpacity }}
       >
-      <motion.div
-        variants={{
-          hidden: {
-            opacity: 0,
-            transform: reduce ? "translateY(0px)" : "translateY(20px)",
-          },
-          show: { opacity: 1, transform: "translateY(0px)" },
-        }}
-        initial="hidden"
-        // stay hidden until the curtain lifts, then fade up in sync with it
-        animate={introDone ? "show" : "hidden"}
-        transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1], delay: 0.1 }}
-      >
-        {/* Availability badge */}
-        {profile.availableForWork && (
-          <div className="mb-8 inline-flex items-center gap-2 font-mono text-xs tracking-[0.2em] uppercase text-muted">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            Available for work
-          </div>
-        )}
-
-        {/* Name — split across two lines, oversized */}
-        <h1 className="font-semibold leading-[0.95] tracking-tight text-[clamp(2.75rem,11vw,9rem)]">
-          <span className="block">{profile.firstName}</span>
-          <span className="block text-muted">{profile.lastName}</span>
-        </h1>
-
-        {/* Social links */}
-        <div className="mt-6 flex items-center gap-5">
-          {SOCIALS.map((s) => (
-            <a
-              key={s.label}
-              href={s.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={s.label}
-              className="text-muted transition-colors hover:text-fg"
+        <motion.div
+          variants={container}
+          initial="hidden"
+          // stay hidden until the curtain lifts, then play in sync with it
+          animate={introDone ? "show" : "hidden"}
+        >
+          {/* Availability badge */}
+          {profile.availableForWork && (
+            <motion.div
+              variants={item}
+              className="mb-8 inline-flex items-center gap-2 font-mono text-xs tracking-[0.2em] uppercase text-muted"
             >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              Available for work
+            </motion.div>
+          )}
+
+          {/* Name — split across two lines, oversized. The padding/negative
+              margin pair gives descenders (the "g") room inside the mask
+              without changing the line spacing. */}
+          <h1 className="font-semibold leading-[0.95] tracking-tight text-[clamp(2.75rem,11vw,9rem)]">
+            <span className="block overflow-hidden pb-[0.14em] -mb-[0.14em]">
+              <motion.span className="block" variants={nameLine}>
+                {profile.firstName}
+              </motion.span>
+            </span>
+            <span className="block overflow-hidden pb-[0.14em] -mb-[0.14em]">
+              <motion.span className="block text-muted" variants={nameLine}>
+                {profile.lastName}
+              </motion.span>
+            </span>
+          </h1>
+
+          {/* Social links */}
+          <motion.div variants={item} className="mt-6 flex items-center gap-5">
+            {SOCIALS.map((s) => (
+              <a
+                key={s.label}
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={s.label}
+                className="lift text-muted hover:text-fg"
               >
-                <path d={s.path} />
-              </svg>
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden
+                >
+                  <path d={s.path} />
+                </svg>
+              </a>
+            ))}
+          </motion.div>
+
+          {/* Role + tagline */}
+          <motion.p
+            variants={item}
+            className="mt-8 max-w-xl text-lg sm:text-xl text-subtle"
+          >
+            <span className="text-fg">{profile.role}.</span>{" "}
+            {profile.tagline}
+          </motion.p>
+
+          {/* Meta row: location + live clock */}
+          <motion.div
+            variants={item}
+            className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 font-mono text-xs tracking-widest uppercase text-muted"
+          >
+            <span>{profile.location}</span>
+            <span className="flex items-center gap-2">
+              <span className="text-faint">Local</span>
+              <Clock />
+            </span>
+          </motion.div>
+
+          {/* CTAs */}
+          <motion.div variants={item} className="mt-12 flex flex-wrap gap-4">
+            <a
+              href="#projects"
+              className="press group inline-flex items-center gap-2 rounded-full border border-fg px-6 py-3 text-sm font-medium text-bg bg-fg hover:bg-transparent hover:text-fg"
+            >
+              View Projects
+              <span
+                aria-hidden
+                className="transition-transform duration-200 ease-strong group-hover:translate-x-1"
+              >
+                →
+              </span>
             </a>
-          ))}
-        </div>
-
-        {/* Role + tagline */}
-        <p className="mt-8 max-w-xl text-lg sm:text-xl text-subtle">
-          <span className="text-fg">{profile.role}.</span>{" "}
-          {profile.tagline}
-        </p>
-
-        {/* Meta row: location + live clock */}
-        <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 font-mono text-xs tracking-widest uppercase text-muted">
-          <span>{profile.location}</span>
-          <span className="flex items-center gap-2">
-            <span className="text-faint">Local</span>
-            <Clock />
-          </span>
-        </div>
-
-        {/* CTAs */}
-        <div className="mt-12 flex flex-wrap gap-4">
-          <a
-            href="#projects"
-            className="rounded-full border border-fg px-6 py-3 text-sm font-medium text-bg bg-fg transition-colors hover:bg-transparent hover:text-fg"
-          >
-            View Projects
-          </a>
-          <a
-            href="#contact"
-            className="rounded-full border border-line px-6 py-3 text-sm font-medium text-fg transition-colors hover:border-fg"
-          >
-            Get in Touch
-          </a>
-        </div>
-      </motion.div>
+            <a
+              href="#contact"
+              className="press rounded-full border border-line px-6 py-3 text-sm font-medium text-fg hover:border-fg"
+            >
+              Get in Touch
+            </a>
+          </motion.div>
+        </motion.div>
       </motion.div>
 
       {/* Scroll cue: bobs gently, fades out once the visitor starts scrolling */}

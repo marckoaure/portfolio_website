@@ -19,6 +19,9 @@ export default function Contact() {
       <div className="mx-auto w-full max-w-6xl">
         <Reveal>
           <SectionLabel>Contact</SectionLabel>
+        </Reveal>
+
+        <Reveal variant="clip" delay={60}>
           <h2 className="max-w-3xl text-4xl sm:text-6xl font-semibold tracking-tight leading-tight">
             Let&apos;s build something.{" "}
             <span className="text-muted">
@@ -51,7 +54,7 @@ export default function Contact() {
                 href={link.href}
                 target={link.href.startsWith("mailto") ? undefined : "_blank"}
                 rel="noopener noreferrer"
-                className="mt-2 inline-block text-fg underline-offset-4 hover:underline"
+                className="link-u mt-2 text-fg"
               >
                 {link.value}
               </a>

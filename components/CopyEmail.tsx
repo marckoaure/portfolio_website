@@ -33,7 +33,7 @@ export default function CopyEmail({ email }: { email: string }) {
       type="button"
       onClick={copy}
       aria-live="polite"
-      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 font-mono text-xs uppercase tracking-widest transition-colors duration-150 ${
+      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 font-mono text-xs uppercase tracking-widest press ${
         copied
           ? "border-fg bg-fg text-bg"
           : "border-line text-muted hover:border-fg hover:text-fg"

@@ -3,35 +3,41 @@
 import { useRef, type ReactNode } from "react";
 import { useInView } from "motion/react";
 
-// Fades + rises its children the FIRST time they scroll into view, then
-// leaves them alone (re-animating on every pass fights the reader).
+// Animates its children in the FIRST time they scroll into view, then leaves
+// them alone (re-animating on every pass fights the reader).
 //
-// The motion itself is a CSS transition (see `.reveal` in globals.css) and
-// this component only flips a data attribute. Two reasons:
+//  variant="rise" (default): fade + 16px rise. For blocks of content.
+//  variant="clip":           wipes in top to bottom. For big headings only.
+//
+// The motion itself is a CSS transition (see `.reveal` / `.reveal-clip` in
+// globals.css) and this component only flips a data attribute. Two reasons:
 //  1. CSS transitions run off the main thread, so they stay smooth while the
 //     page is still loading images and scripts.
-//  2. The visible state sets `transform: none`, so anything inside that uses
-//     `position: fixed` (the project popup, the handshake video) still
-//     positions against the viewport once the reveal has finished. A lingering
-//     transform on an ancestor would break that.
+//  2. The visible state of "rise" sets `transform: none`, so anything inside
+//     that uses `position: fixed` (the project popup, the handshake video)
+//     still positions against the viewport once the reveal has finished. A
+//     lingering transform on an ancestor would break that.
 export default function Reveal({
   children,
   delay = 0,
+  variant = "rise",
   className = "",
 }: {
   children: ReactNode;
   /** Stagger offset in ms for items in a group (use 50–80 ms steps). */
   delay?: number;
+  variant?: "rise" | "clip";
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   // Fire when the element is ~80px into the viewport so it is actually seen.
   const inView = useInView(ref, { once: true, margin: "0px 0px -80px 0px" });
+  const base = variant === "clip" ? "reveal-clip" : "reveal";
 
   return (
     <div
       ref={ref}
-      className={`reveal ${className}`.trim()}
+      className={`${base} ${className}`.trim()}
       data-visible={inView || undefined}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
     >

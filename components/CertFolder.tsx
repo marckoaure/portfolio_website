@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { certifications, type Certification } from "@/data/certifications";
 import Folder from "./Folder";
+import { useDialogFocus } from "@/lib/useDialogFocus";
 
 export default function CertFolder() {
   const [open, setOpen] = useState(false); // popup open
   const [active, setActive] = useState<Certification | null>(null); // selected cert
   const [folderKey, setFolderKey] = useState(0); // remount to reset the folder
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, open);
 
   const closeAll = () => {
     setOpen(false);
@@ -55,9 +58,14 @@ export default function CertFolder() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={closeAll}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Certifications"
           >
             <motion.div
-              className="relative w-full max-w-3xl rounded-2xl border border-line bg-bg p-6 sm:p-10"
+              ref={dialogRef}
+              tabIndex={-1}
+              className="relative w-full max-w-3xl rounded-2xl border border-line bg-bg p-6 outline-none sm:p-10"
               initial={{ opacity: 0, transform: "scale(0.96)" }}
               animate={{ opacity: 1, transform: "scale(1)" }}
               exit={{ opacity: 0, transform: "scale(0.96)" }}
@@ -68,7 +76,7 @@ export default function CertFolder() {
                 type="button"
                 onClick={closeAll}
                 aria-label="Close"
-                className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-fg hover:text-fg"
+                className="press absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted hover:border-fg hover:text-fg"
               >
                 ×
               </button>
@@ -130,9 +138,14 @@ export default function CertFolder() {
                       className="mt-5 w-full rounded-xl border border-line object-contain"
                     />
                   ) : (
-                    <div className="mt-5 flex aspect-[4/3] w-full items-center justify-center rounded-xl border border-dashed border-line bg-gradient-to-br from-line to-bg text-center">
-                      <span className="font-mono text-xs uppercase tracking-widest text-faint">
-                        Certificate image coming soon
+                    // No scan yet: a numbered plate, matching the project
+                    // cards, instead of an apology.
+                    <div className="mt-5 flex aspect-[4/3] w-full flex-col items-center justify-center rounded-xl border border-line bg-gradient-to-br from-line to-bg text-center">
+                      <span className="font-mono text-6xl font-bold text-faint2 opacity-60 sm:text-7xl">
+                        {String(certifications.indexOf(active) + 1).padStart(2, "0")}
+                      </span>
+                      <span className="mt-3 font-mono text-[10px] uppercase tracking-[0.3em] text-muted">
+                        Certificate
                       </span>
                     </div>
                   )}
@@ -142,22 +155,18 @@ export default function CertFolder() {
                     {active.name}
                   </h3>
 
-                  <div className="mt-6 font-mono text-xs uppercase tracking-widest">
-                    {active.url ? (
+                  {active.url && (
+                    <div className="mt-6 font-mono text-xs uppercase tracking-widest">
                       <a
                         href={active.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-fg underline-offset-4 hover:underline"
+                        className="link-u text-fg"
                       >
                         View credential ↗
                       </a>
-                    ) : (
-                      <span className="text-faint">
-                        Credential link coming soon
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </>
               )}
             </motion.div>

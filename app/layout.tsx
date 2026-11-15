@@ -5,8 +5,10 @@ import ThemeProvider from "@/components/ThemeProvider";
 import { profile } from "@/data/profile";
 
 // Runs before the page paints: if the visitor previously chose light mode,
-// set it now so there's no flash of the wrong theme on load.
-const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.dataset.theme='light';}}catch(e){}})();`;
+// set it now so there's no flash of the wrong theme on load. It also marks
+// the page when this tab already watched the intro, so CSS can hide the
+// preloader before React starts (see `html[data-intro]` in globals.css).
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.dataset.theme='light';}}catch(e){}try{if(sessionStorage.getItem('introSeen')==='1'){document.documentElement.dataset.intro='seen';}}catch(e){}})();`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,6 +54,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-bg text-fg">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <a href="#main" className="skip-link">
+          Skip to content
+        </a>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
