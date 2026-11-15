@@ -25,41 +25,86 @@ function readCachedCount() {
   }
 }
 
-// A subtle zig-zag silk strand plus stray "split-end" threads, computed once.
+// ---------------------------------------------------------------------------
+// Web geometry, computed once. Everything is deterministic (seeded) so the
+// server and the browser draw exactly the same shapes.
+// ---------------------------------------------------------------------------
 const frac = (n: number) => n - Math.floor(n);
+const rand = (i: number, seed: number) => frac(Math.sin(i * seed) * 43758.5453);
 
-const WEB_PTS: { x: number; y: number }[] = (() => {
-  const cx = 55;
-  const amp = 6; // gentle sway
-  const seg = 30;
-  const pts = [{ x: cx, y: 0 }];
-  let i = 0;
-  for (let y = seg; y <= 510; y += seg) {
-    // small random wobble so it reads as organic silk, not a rigid zig-zag
-    const wob = (frac(Math.sin(i * 91.7) * 4137.1) - 0.5) * 4;
-    pts.push({ x: cx + (i % 2 === 0 ? amp : -amp) + wob, y });
-    i++;
+// The web LINE: two silk strands twisted round each other like rope, joined
+// by short cross-ties. Drawn in a 40 x 1000 box that is stretched to the
+// height of the screen, so its top end is always off-screen.
+const LINE_BOX = { w: 40, h: 1000 };
+const twist = (phase: number) => {
+  const pts: string[] = [];
+  for (let y = 0; y <= LINE_BOX.h; y += 10) {
+    const x = LINE_BOX.w / 2 + 7 * Math.sin((2 * Math.PI * y) / 90 + phase);
+    pts.push(`${x.toFixed(1)} ${y}`);
   }
-  pts.push({ x: cx, y: 534 }); // apex of the cone
-  return pts;
-})();
+  return "M " + pts.join(" L ");
+};
+const LINE_A = twist(0);
+const LINE_B = twist(Math.PI);
+// A tie wherever the two strands are furthest apart (every half twist).
+const LINE_TIES = Array.from({ length: 22 }, (_, k) => {
+  const y = 22.5 + k * 45;
+  const lean = (rand(k, 12.9898) - 0.5) * 6;
+  return `M 13 ${(y - lean).toFixed(1)} L 27 ${(y + lean).toFixed(1)}`;
+}).join(" ");
 
-const WEB_STRAND_D =
-  "M " + WEB_PTS.map((p) => `${p.x.toFixed(1)} ${p.y}`).join(" L ");
-
-// stray threads splaying off the strand, like split ends of hair
-const WEB_WISPS = WEB_PTS.slice(1, -1).map((p, i) => {
-  const r = frac(Math.sin(i * 57.3 + 11) * 7219.4);
-  const side = i % 2 === 0 ? -1 : 1;
+// The SPLAT: where the web lands on the clip. Spokes fan out from the hit
+// point (longer downward, across the clip; shorter upward, round the line),
+// tied together by two sagging rungs like a real orb web.
+const SPLAT_BOX = { w: 240, h: 120, cx: 120, cy: 60 };
+const SPLAT_SPOKES = Array.from({ length: 13 }, (_, i) => {
+  const angle = (i / 13) * Math.PI * 2 + (rand(i, 12.9898) - 0.5) * 0.35;
+  const reach = Math.sin(angle) > 0 ? 1 : 0.45;
+  const len = (38 + rand(i, 78.233) * 52) * reach;
   return {
-    x1: p.x,
-    y1: p.y,
-    x2: p.x + side * (2 + r * 8),
-    y2: p.y + 3 + r * 12,
-    w: 0.5 + r * 0.4,
-    o: 0.2 + r * 0.22,
+    x: SPLAT_BOX.cx + Math.cos(angle) * len * 1.25,
+    y: SPLAT_BOX.cy + Math.sin(angle) * len,
+    // a frayed thread carrying on past the end of the spoke
+    fx: SPLAT_BOX.cx + Math.cos(angle + 0.25) * len * 1.25 * 1.18,
+    fy: SPLAT_BOX.cy + Math.sin(angle + 0.25) * len * 1.18,
   };
 });
+const rung = (f: number) => {
+  const at = (i: number) => {
+    const sp = SPLAT_SPOKES[i % SPLAT_SPOKES.length];
+    return {
+      x: SPLAT_BOX.cx + (sp.x - SPLAT_BOX.cx) * f,
+      y: SPLAT_BOX.cy + (sp.y - SPLAT_BOX.cy) * f,
+    };
+  };
+  let d = `M ${at(0).x.toFixed(1)} ${at(0).y.toFixed(1)}`;
+  for (let i = 0; i < SPLAT_SPOKES.length; i++) {
+    const p0 = at(i);
+    const p1 = at(i + 1);
+    // control point = the midpoint pulled toward the centre, so each span sags
+    const mx = (p0.x + p1.x) / 2;
+    const my = (p0.y + p1.y) / 2;
+    const cx = mx + (SPLAT_BOX.cx - mx) * 0.22;
+    const cy = my + (SPLAT_BOX.cy - my) * 0.22;
+    d += ` Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+  }
+  return d;
+};
+const SPLAT_RUNGS = [rung(0.4), rung(0.72)];
+
+// LEFTOVERS: a few loose threads that drift down where the clip used to be.
+const LEFTOVERS = Array.from({ length: 6 }, (_, i) => {
+  const x = -46 + i * 18 + (rand(i, 39.3467) - 0.5) * 10;
+  const len = 12 + rand(i, 93.9898) * 20;
+  const lean = (rand(i, 51.123) - 0.5) * 12;
+  return { x1: x, y1: 0, x2: x + lean, y2: len, o: 0.35 + rand(i, 7.77) * 0.4 };
+});
+
+// Timeline of the pull, in seconds. One place to tune the feel.
+const PULL = {
+  total: 0.9, // whole sequence
+  shot: 0.12, // web travels from the top of the screen to the clip
+};
 
 export default function Handshake() {
   const [open, setOpen] = useState(false);
@@ -117,7 +162,7 @@ export default function Handshake() {
         setOpen(false);
         setClosing(false);
       },
-      reduce ? 260 : 1300
+      reduce ? 260 : PULL.total * 1000 + 50
     );
     return () => clearTimeout(t);
   }, [closing, reduce]);
@@ -162,7 +207,14 @@ export default function Handshake() {
         {count.toLocaleString()} {count === 1 ? "bump" : "bumps"}
       </p>
 
-      {/* Center-screen popup: plays the clip once, then a web yanks it away */}
+      {/* Center-screen popup: plays the clip once, then a web yanks it away.
+
+          The pull, in order (see PULL for the timing):
+            1. the web line shoots DOWN from above the screen and hits the clip
+            2. a splat sticks to the clip, which squashes from the hit
+            3. the slack line snaps taut and the clip stretches toward the pull
+            4. the clip is hauled up, swinging from the point the web grabbed
+            5. a few loose threads drift down where it was */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -176,149 +228,284 @@ export default function Handshake() {
             aria-modal="true"
             aria-label="Handshake video"
           >
-            <motion.div
+            {/* Static frame: marks where the clip sits and never moves, so the
+                leftover threads stay behind when the clip is pulled away. */}
+            <div
               ref={dialogRef}
               tabIndex={-1}
               className="relative w-full max-w-lg outline-none"
-              initial={{ opacity: 0, scale: reduce ? 1 : 0.94 }}
-              animate={
-                closing
-                  ? reduce
-                    ? { opacity: 0, transition: { duration: 0.2 } }
-                    : {
-                        // web sticks (jolt), holds a beat, then a slow hard yank
-                        opacity: [1, 1, 1, 1, 0],
-                        y: [0, -12, 6, 6, -1500],
-                        rotate: [0, -1.5, 1.5, 1.5, -18],
-                        scale: [1, 1, 1, 1, 0.42],
-                        transition: {
-                          duration: 1.2,
-                          times: [0, 0.1, 0.22, 0.35, 1],
-                          ease: ["easeOut", "easeOut", "linear", "easeIn"],
-                        },
-                      }
-                  : {
-                      opacity: 1,
-                      scale: 1,
-                      transition: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
-                    }
-              }
               onClick={(e) => e.stopPropagation()}
             >
-              {/* The web: shoots up from the clip and sticks, then pulls it up */}
               {closing && !reduce && (
                 <motion.div
-                  className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2"
-                  initial={{ opacity: 0, scaleY: 0 }}
-                  animate={{ opacity: 1, scaleY: 1 }}
-                  style={{ transformOrigin: "bottom" }}
-                  transition={{ duration: 0.14, ease: "easeOut" }}
+                  aria-hidden
+                  className="pointer-events-none absolute left-1/2 top-0"
+                  initial={{ opacity: 0, transform: "translateY(0px)" }}
+                  animate={{
+                    opacity: [0, 0.8, 0],
+                    transform: [
+                      "translateY(0px)",
+                      "translateY(6px)",
+                      "translateY(34px)",
+                    ],
+                  }}
+                  transition={{
+                    delay: 0.42,
+                    duration: 0.48,
+                    times: [0, 0.25, 1],
+                    ease: "easeOut",
+                  }}
                 >
-                  <svg
-                    width="110"
-                    height="640"
-                    viewBox="0 0 110 640"
-                    className="block overflow-visible"
-                  >
-                    <defs>
-                      <filter
-                        id="webGlow"
-                        x="-60%"
-                        y="-60%"
-                        width="220%"
-                        height="220%"
-                      >
-                        <feGaussianBlur stdDeviation="1.1" result="b" />
-                        <feMerge>
-                          <feMergeNode in="b" />
-                          <feMergeNode in="SourceGraphic" />
-                        </feMerge>
-                      </filter>
-                    </defs>
-
-                    {/* subtle silk strand + stray split-end threads */}
-                    <g
-                      stroke="white"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      filter="url(#webGlow)"
-                    >
-                      <path d={WEB_STRAND_D} strokeWidth="1.8" opacity="0.8" />
-                      <path
-                        d={WEB_STRAND_D}
-                        strokeWidth="0.7"
-                        opacity="0.45"
-                        transform="translate(1.6 0)"
-                      />
-                      {WEB_WISPS.map((w, i) => (
+                  <svg width="1" height="1" className="block overflow-visible">
+                    <g stroke="white" strokeLinecap="round">
+                      {LEFTOVERS.map((t, i) => (
                         <line
                           key={i}
-                          x1={w.x1}
-                          y1={w.y1}
-                          x2={w.x2}
-                          y2={w.y2}
-                          strokeWidth={w.w}
-                          opacity={w.o}
+                          x1={t.x1}
+                          y1={t.y1}
+                          x2={t.x2}
+                          y2={t.y2}
+                          strokeWidth="0.8"
+                          opacity={t.o}
                         />
                       ))}
-                    </g>
-
-                    {/* cone that spreads wider the closer it gets to the clip */}
-                    <g
-                      stroke="white"
-                      fill="none"
-                      strokeLinecap="round"
-                      filter="url(#webGlow)"
-                    >
-                      {/* fine fan strands from the apex, with frayed ends */}
-                      {Array.from({ length: 11 }).map((_, i) => {
-                        const bx = -25 + (i / 10) * 160;
-                        const r = frac(Math.sin(i * 33.7) * 2851.3);
-                        return (
-                          <g key={`f${i}`}>
-                            <line x1={55} y1={534} x2={bx} y2={616} strokeWidth="1" opacity="0.55" />
-                            {/* split-end wisp continuing past the clip edge */}
-                            <line
-                              x1={bx}
-                              y1={616}
-                              x2={bx + (bx - 55) * 0.12}
-                              y2={616 + 6 + r * 10}
-                              strokeWidth="0.6"
-                              opacity="0.3"
-                            />
-                          </g>
-                        );
-                      })}
-                      {/* faint web rungs across the cone */}
-                      {[0.45, 0.75].map((f, i) => {
-                        const y = 534 + f * 82;
-                        const half = 80 * f;
-                        const d = `M ${55 - half} ${y} Q 55 ${y + 5 + 7 * f} ${55 + half} ${y}`;
-                        return (
-                          <path key={`c${i}`} d={d} strokeWidth="0.7" opacity={0.3 + f * 0.2} />
-                        );
-                      })}
-                      {/* small anchor at the apex */}
-                      <circle cx="55" cy="534" r="2.5" fill="white" stroke="none" />
                     </g>
                   </svg>
                 </motion.div>
               )}
 
-              {/* The clip (its own rounded/overflow wrapper so the web isn't clipped) */}
-              <div className="overflow-hidden rounded-2xl border border-line bg-black">
-                <video
-                  ref={videoRef}
-                  src={VIDEO_SRC}
-                  autoPlay
-                  muted
-                  playsInline
-                  onEnded={startClose}
-                  className="block w-full"
-                />
-              </div>
-            </motion.div>
+              {/* MOVER: only travels up and down. The line hangs from it, so
+                  the line stays vertical while the clip swings underneath. */}
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  transform: reduce
+                    ? "translateY(0px) scale(1)"
+                    : "translateY(0px) scale(0.94)",
+                }}
+                animate={
+                  closing
+                    ? reduce
+                      ? { opacity: 0, transition: { duration: 0.2 } }
+                      : {
+                          // opacity must be stated: a key that drops out
+                          // of `animate` is animated back to its `initial`
+                          // value (0), which faded the clip out mid-pull.
+                          opacity: 1,
+                          // hit pushes it down, the taut line lifts it a
+                          // little, then the hard pull (accelerating)
+                          transform: [
+                            "translateY(0px) scale(1)",
+                            "translateY(0px) scale(1)",
+                            "translateY(6px) scale(1)",
+                            "translateY(-6px) scale(1)",
+                            "translateY(-10px) scale(1)",
+                            "translateY(-1700px) scale(1)",
+                          ],
+                          transition: {
+                            duration: PULL.total,
+                            times: [0, 0.133, 0.21, 0.3, 0.44, 1],
+                            ease: [
+                              "linear",
+                              "easeOut",
+                              "easeInOut",
+                              "linear",
+                              [0.32, 0, 0.67, 0],
+                            ],
+                          },
+                        }
+                    : {
+                        opacity: 1,
+                        transform: "translateY(0px) scale(1)",
+                        transition: {
+                          duration: 0.25,
+                          ease: [0.23, 1, 0.32, 1],
+                        },
+                      }
+                }
+              >
+                {/* 1. The web line. Grows from its top end (off-screen) down
+                    to the clip, at constant speed like a projectile. */}
+                {closing && !reduce && (
+                  <motion.div
+                    aria-hidden
+                    className="pointer-events-none absolute bottom-full left-1/2 h-[110vh] w-10 -translate-x-1/2"
+                    style={{ transformOrigin: "50% 0%" }}
+                    initial={{ transform: "scaleY(0.02)" }}
+                    animate={{ transform: "scaleY(1)" }}
+                    transition={{ duration: PULL.shot, ease: "linear" }}
+                  >
+                    {/* 3. Slack to taut: squeezing the twist sideways pulls
+                        the two strands into one tight rope. */}
+                    <motion.div
+                      className="h-full w-full"
+                      initial={{ transform: "scaleX(1)" }}
+                      animate={{
+                        transform: ["scaleX(1)", "scaleX(1)", "scaleX(0.45)"],
+                      }}
+                      transition={{
+                        duration: 0.4,
+                        times: [0, 0.55, 1],
+                        ease: ["linear", [0.23, 1, 0.32, 1]],
+                      }}
+                    >
+                      <svg
+                        viewBox={`0 0 ${LINE_BOX.w} ${LINE_BOX.h}`}
+                        preserveAspectRatio="none"
+                        className="block h-full w-full overflow-visible"
+                      >
+                        <g
+                          stroke="white"
+                          fill="none"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          filter="url(#webGlow)"
+                        >
+                          <path d={LINE_A} strokeWidth="2.4" opacity="0.95" vectorEffect="non-scaling-stroke" />
+                          <path d={LINE_B} strokeWidth="1.8" opacity="0.75" vectorEffect="non-scaling-stroke" />
+                          <path d={LINE_TIES} strokeWidth="1" opacity="0.5" vectorEffect="non-scaling-stroke" />
+                        </g>
+                      </svg>
+                    </motion.div>
+                  </motion.div>
+                )}
+
+                {/* CLIP: pivots at its top centre, the point the web grabbed. */}
+                <motion.div
+                  style={{ transformOrigin: "50% 0%" }}
+                  initial={{ transform: "rotate(0deg) scale(1, 1)" }}
+                  animate={
+                    closing && !reduce
+                      ? {
+                          // squash from the hit, stretch toward the pull,
+                          // then swing like a weight on a line as it shrinks
+                          transform: [
+                            "rotate(0deg) scale(1, 1)",
+                            "rotate(0deg) scale(1, 1)",
+                            "rotate(0deg) scale(1.03, 0.95)",
+                            "rotate(-1.5deg) scale(0.98, 1.05)",
+                            "rotate(1deg) scale(0.98, 1.05)",
+                            "rotate(-10deg) scale(0.75, 0.8)",
+                            "rotate(8deg) scale(0.5, 0.5)",
+                          ],
+                          transition: {
+                            duration: PULL.total,
+                            times: [0, 0.133, 0.21, 0.3, 0.44, 0.72, 1],
+                            ease: [
+                              "linear",
+                              "easeOut",
+                              "easeOut",
+                              "easeInOut",
+                              "easeIn",
+                              "easeOut",
+                            ],
+                          },
+                        }
+                      : { transform: "rotate(0deg) scale(1, 1)" }
+                  }
+                >
+                  {/* 2. The splat, stuck on the clip at the hit point. */}
+                  {closing && !reduce && (
+                    <motion.div
+                      aria-hidden
+                      className="pointer-events-none absolute left-1/2 top-0 z-10 w-60 -translate-x-1/2 -translate-y-1/2"
+                      initial={{ opacity: 0, transform: "scale(0.5)" }}
+                      animate={{ opacity: 1, transform: "scale(1)" }}
+                      transition={{
+                        delay: PULL.shot,
+                        duration: 0.09,
+                        ease: [0.23, 1, 0.32, 1],
+                      }}
+                    >
+                      <svg
+                        viewBox={`0 0 ${SPLAT_BOX.w} ${SPLAT_BOX.h}`}
+                        className="block w-full overflow-visible"
+                      >
+                        <defs>
+                          <filter
+                            id="webGlow"
+                            x="-60%"
+                            y="-60%"
+                            width="220%"
+                            height="220%"
+                          >
+                            <feGaussianBlur stdDeviation="1.1" result="b" />
+                            <feMerge>
+                              <feMergeNode in="b" />
+                              <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                          </filter>
+                        </defs>
+                        <g
+                          stroke="white"
+                          fill="none"
+                          strokeLinecap="round"
+                          filter="url(#webGlow)"
+                        >
+                          {SPLAT_SPOKES.map((sp, i) => (
+                            <g key={i}>
+                              <line
+                                x1={SPLAT_BOX.cx}
+                                y1={SPLAT_BOX.cy}
+                                x2={sp.x}
+                                y2={sp.y}
+                                strokeWidth="1.1"
+                                opacity="0.8"
+                              />
+                              <line
+                                x1={sp.x}
+                                y1={sp.y}
+                                x2={sp.fx}
+                                y2={sp.fy}
+                                strokeWidth="0.6"
+                                opacity="0.35"
+                              />
+                            </g>
+                          ))}
+                          {SPLAT_RUNGS.map((d, i) => (
+                            <path
+                              key={i}
+                              d={d}
+                              strokeWidth="0.7"
+                              opacity={0.55 - i * 0.15}
+                            />
+                          ))}
+                          {/* the knot where the line meets the clip */}
+                          <circle
+                            cx={SPLAT_BOX.cx}
+                            cy={SPLAT_BOX.cy}
+                            r="7"
+                            fill="white"
+                            stroke="none"
+                            opacity="0.3"
+                          />
+                          <circle
+                            cx={SPLAT_BOX.cx}
+                            cy={SPLAT_BOX.cy}
+                            r="3.5"
+                            fill="white"
+                            stroke="none"
+                          />
+                        </g>
+                      </svg>
+                    </motion.div>
+                  )}
+
+                  {/* The clip (its own rounded/overflow wrapper so the web isn't clipped) */}
+                  <div className="overflow-hidden rounded-2xl border border-line bg-black">
+                    <video
+                      ref={videoRef}
+                      src={VIDEO_SRC}
+                      autoPlay
+                      muted
+                      playsInline
+                      onEnded={startClose}
+                      className="block w-full"
+                    />
+                  </div>
+                </motion.div>
+              </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
