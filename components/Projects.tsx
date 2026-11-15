@@ -10,7 +10,7 @@ export default async function Projects() {
   return (
     <section
       id="projects"
-      className="px-6 sm:px-10 lg:px-20 py-24 sm:py-32 border-t border-line"
+      className="px-6 sm:px-10 lg:px-20 shell py-24 sm:py-32 border-t border-line"
     >
       <div className="mx-auto w-full max-w-6xl">
         {/* Header: label + line + the certifications folder */}

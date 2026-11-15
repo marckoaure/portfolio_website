@@ -5,7 +5,7 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-auto px-6 sm:px-10 lg:px-20 py-10 border-t border-line">
+    <footer className="mt-auto px-6 sm:px-10 lg:px-20 shell py-10 border-t border-line">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="font-mono text-[11px] tracking-widest uppercase text-faint">
           &copy; {year} {profile.fullName}. Programmed with Next.js, TypeScript,

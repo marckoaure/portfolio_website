@@ -69,6 +69,22 @@ body {
   border-radius: 4px;
 }
 
+/* ---------- Page shell: keep content clear of the fixed side-nav ---------- */
+/* The side-nav (desktop only, from 64rem) is about 180px wide including its
+   hover shift. Sections used a symmetric 5rem padding, so on laptop widths
+   the nav labels sat on top of the content. Between 64rem and 98rem the
+   left padding grows to 13rem and the inner container stops centring, so the
+   content's left edge stays at 13rem. From 98rem up, normal centring already
+   leaves 13rem of room, so the two layouts meet without a jump. */
+@media (width >= 64rem) and (width < 98rem) {
+  .shell {
+    padding-left: 13rem;
+  }
+  .shell > .max-w-6xl {
+    margin-left: 0;
+  }
+}
+
 /* Skip link: invisible until a keyboard user tabs to it. */
 .skip-link {
   position: fixed;

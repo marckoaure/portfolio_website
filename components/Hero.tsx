@@ -99,7 +99,7 @@ export default function Hero() {
     <section
       ref={sectionRef}
       id="home"
-      className="relative min-h-[100svh] flex flex-col justify-center px-6 sm:px-10 lg:px-20 overflow-hidden"
+      className="relative min-h-[100svh] flex flex-col justify-center px-6 sm:px-10 lg:px-20 shell overflow-hidden"
     >
       <ThreeHero />
 
@@ -130,7 +130,7 @@ export default function Hero() {
           {/* Name — split across two lines, oversized. The padding/negative
               margin pair gives descenders (the "g") room inside the mask
               without changing the line spacing. */}
-          <h1 className="font-semibold leading-[0.95] tracking-tight text-[clamp(2.75rem,11vw,9rem)]">
+          <h1 className="font-semibold leading-[0.95] tracking-tight text-[clamp(2.75rem,11vw,9rem)] lg:text-[clamp(2.75rem,10vw,9rem)]">
             <span className="block overflow-hidden pb-[0.14em] -mb-[0.14em]">
               <motion.span className="block" variants={nameLine}>
                 {profile.firstName}
