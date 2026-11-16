@@ -1,8 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  Component,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useDialogFocus } from "@/lib/useDialogFocus";
+
+// The 3D hand (Three.js + a 94 KB model) is only fetched once the popup
+// opens, so it costs nothing for visitors who never press Bump Me.
+const WebHand = dynamic(() => import("./WebHand"), { ssr: false });
+
+// If WebGL is unavailable the 3D hand throws while starting up. Swallow that
+// here: the pull then simply plays without the hand.
+class HandBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 const VIDEO_SRC =
   "/spider-man-homecoming-handshake-peter-and-ned-handshake.mp4";
@@ -114,9 +138,26 @@ const PULL = {
   shot: 0.12, // web travels from the top of the screen to the clip
 };
 
+// The hand's own beats, in seconds, around the pull.
+const HAND = {
+  in: 0.2, // drops in from the top before it shoots
+  wave: 0.95, // waves at the visitor after catching the clip
+  out: 0.25, // pulls back up out of view
+};
+
+// "shoot": hand is in, web-shooter sign. "wave": clip caught, waving.
+// "out": leaving. "idle": not part of the current close (or no hand at all).
+type Stage = "idle" | "shoot" | "wave" | "out";
+
 export default function Handshake() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false); // web-pull in progress
+  const [stage, setStage] = useState<Stage>("idle");
+  // Decided once, at the moment the close starts: is the 3D hand taking part,
+  // and how far (px) must the clip travel to reach its palm?
+  const [pull, setPull] = useState<{ hand: boolean; travel: number } | null>(null);
+  const handReady = useRef(false); // set by the hand once its model has loaded
+  const closingRef = useRef(false); // guards against a second close mid-pull
   const cached = useSyncExternalStore(subscribeNoop, readCachedCount, () => 0);
   const [live, setLive] = useState<number | null>(null); // null = not fetched yet
   const count = live ?? cached;
@@ -160,20 +201,53 @@ export default function Handshake() {
   };
 
   // Every close routes through here so it plays the web-pull exit.
-  const startClose = () => setClosing(true);
+  const startClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
 
-  // After the web yanks the clip away, actually unmount it.
+    const hand = handReady.current && !reduce;
+    // The hand hangs from the top of the screen; its palm sits about 55% of
+    // the way down its own box (200px tall on phones, 260px from `sm` up),
+    // and the box itself starts 40px above the screen edge (`-top-10`).
+    const box = window.innerWidth < 640 ? 200 : 260;
+    const palmY = box * 0.55 - 40;
+    const clipTop = dialogRef.current?.getBoundingClientRect().top ?? 300;
+    setPull({ hand, travel: Math.max(40, clipTop - palmY) });
+    setStage(hand ? "shoot" : "idle");
+    setClosing(true);
+  };
+
+  // Run the beats of the close, then unmount the popup.
   useEffect(() => {
     if (!closing) return;
-    const t = window.setTimeout(
-      () => {
-        setOpen(false);
-        setClosing(false);
-      },
-      reduce ? 260 : PULL.total * 1000 + 50
-    );
-    return () => clearTimeout(t);
-  }, [closing, reduce]);
+    const timers: number[] = [];
+    const at = (seconds: number, fn: () => void) =>
+      timers.push(window.setTimeout(fn, seconds * 1000));
+    const finish = () => {
+      closingRef.current = false;
+      setOpen(false);
+      setClosing(false);
+      setStage("idle");
+      setPull(null);
+    };
+
+    if (reduce) {
+      at(0.26, finish);
+    } else if (pull?.hand) {
+      const caught = HAND.in + PULL.total;
+      at(caught, () => setStage("wave"));
+      at(caught + HAND.wave, () => setStage("out"));
+      at(caught + HAND.wave + HAND.out + 0.05, finish);
+    } else {
+      at(PULL.total + 0.05, finish);
+    }
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, [closing, reduce, pull]);
+
+  // With the hand, everything in the pull waits for it to drop in first.
+  const lead = pull?.hand ? HAND.in : 0;
+  const handShown = stage === "shoot" || stage === "wave";
+  const clipCaught = stage === "wave" || stage === "out";
 
   // Lock page scroll + restart the video from the start whenever it opens.
   useEffect(() => {
@@ -187,11 +261,19 @@ export default function Handshake() {
     };
   }, [open]);
 
+  // The Escape listener below is attached once per open, so it must not hold
+  // an old copy of startClose. It calls through this ref, which is refreshed
+  // after every render.
+  const startCloseRef = useRef(startClose);
+  useEffect(() => {
+    startCloseRef.current = startClose;
+  });
+
   // Close on Escape.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") startClose();
+      if (e.key === "Escape") startCloseRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -258,7 +340,7 @@ export default function Handshake() {
                     ],
                   }}
                   transition={{
-                    delay: 0.42,
+                    delay: 0.42 + lead,
                     duration: 0.48,
                     times: [0, 0.25, 1],
                     ease: "easeOut",
@@ -275,7 +357,9 @@ export default function Handshake() {
               )}
 
               {/* MOVER: only travels up and down. The line hangs from it, so
-                  the line stays vertical while the clip swings underneath. */}
+                  the line stays vertical while the clip swings underneath.
+                  Hidden once the hand has caught the clip. */}
+              <div style={{ visibility: clipCaught ? "hidden" : "visible" }}>
               <motion.div
                 initial={{
                   opacity: 0,
@@ -300,10 +384,13 @@ export default function Handshake() {
                             "translateY(6px) scale(1)",
                             "translateY(-6px) scale(1)",
                             "translateY(-10px) scale(1)",
-                            "translateY(-1700px) scale(1)",
+                            // to the hand's palm, or off the top of the
+                            // screen when there is no hand
+                            `translateY(${-(pull?.hand ? pull.travel : 1700)}px) scale(1)`,
                           ],
                           transition: {
                             duration: PULL.total,
+                            delay: lead,
                             times: [0, 0.133, 0.21, 0.3, 0.44, 1],
                             ease: [
                               "linear",
@@ -333,7 +420,7 @@ export default function Handshake() {
                     style={{ transformOrigin: "50% 0%" }}
                     initial={{ transform: "scaleY(0.02)" }}
                     animate={{ transform: "scaleY(1)" }}
-                    transition={{ duration: PULL.shot, ease: "linear" }}
+                    transition={{ duration: PULL.shot, delay: lead, ease: "linear" }}
                   >
                     {/* 3. Slack to taut: squeezing the twist sideways pulls
                         the two strands into one tight rope. */}
@@ -345,6 +432,7 @@ export default function Handshake() {
                       }}
                       transition={{
                         duration: 0.4,
+                        delay: lead,
                         times: [0, 0.55, 1],
                         ease: ["linear", [0.23, 1, 0.32, 1]],
                       }}
@@ -385,11 +473,18 @@ export default function Handshake() {
                             "rotate(0deg) scale(1.03, 0.95)",
                             "rotate(-1.5deg) scale(0.98, 1.05)",
                             "rotate(1deg) scale(0.98, 1.05)",
-                            "rotate(-10deg) scale(0.75, 0.8)",
-                            "rotate(8deg) scale(0.5, 0.5)",
+                            // with the hand: shrink into its palm.
+                            // without: swing away off the top.
+                            pull?.hand
+                              ? "rotate(-6deg) scale(0.42, 0.45)"
+                              : "rotate(-10deg) scale(0.75, 0.8)",
+                            pull?.hand
+                              ? "rotate(0deg) scale(0.05, 0.05)"
+                              : "rotate(8deg) scale(0.5, 0.5)",
                           ],
                           transition: {
                             duration: PULL.total,
+                            delay: lead,
                             times: [0, 0.133, 0.21, 0.3, 0.44, 0.72, 1],
                             ease: [
                               "linear",
@@ -412,7 +507,7 @@ export default function Handshake() {
                       initial={{ opacity: 0, transform: "scale(0.5)" }}
                       animate={{ opacity: 1, transform: "scale(1)" }}
                       transition={{
-                        delay: PULL.shot,
+                        delay: PULL.shot + lead,
                         duration: 0.09,
                         ease: [0.23, 1, 0.32, 1],
                       }}
@@ -505,7 +600,37 @@ export default function Handshake() {
                   </div>
                 </motion.div>
               </motion.div>
+              </div>
             </div>
+
+            {/* The hand. Mounted as soon as the popup opens (so the model is
+                loaded by the time it is needed) but parked above the screen
+                until the close begins. */}
+            {!reduce && (
+              <HandBoundary>
+                <motion.div
+                  aria-hidden
+                  className="pointer-events-none fixed -top-10 left-1/2 -translate-x-1/2"
+                  initial={{ transform: "translateY(-105%)" }}
+                  animate={{
+                    transform: handShown ? "translateY(0%)" : "translateY(-105%)",
+                  }}
+                  transition={{
+                    duration: handShown ? HAND.in : HAND.out,
+                    ease: [0.23, 1, 0.32, 1],
+                  }}
+                >
+                  <WebHand
+                    pose={stage === "wave" ? "wave" : stage === "out" ? "open" : "shoot"}
+                    active={stage !== "idle"}
+                    onReady={() => {
+                      handReady.current = true;
+                    }}
+                    className="h-[200px] w-[200px] sm:h-[260px] sm:w-[260px]"
+                  />
+                </motion.div>
+              </HandBoundary>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

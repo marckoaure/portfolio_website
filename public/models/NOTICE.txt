@@ -1,0 +1,12 @@
+hand.glb
+
+The "generic hand" model (right hand) from the WebXR Input Profiles project:
+  https://github.com/immersive-web/webxr-input-profiles
+  package: @webxr-input-profiles/assets 1.0.19, dist/profiles/generic-hand/right.glb
+
+Copyright (c) the WebXR Input Profiles contributors (W3C Immersive Web
+Working Group). Licensed under the W3C Software and Document License:
+  https://www.w3.org/Consortium/Legal/copyright-software
+
+Used unmodified. The red glove material is applied at runtime in
+components/WebHand.tsx.
