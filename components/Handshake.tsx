@@ -141,7 +141,7 @@ const PULL = {
 // The hand's own beats, in seconds, around the pull.
 const HAND = {
   in: 0.2, // drops in from the top before it shoots
-  wave: 0.95, // waves at the visitor after catching the clip
+  wave: 1.8, // waves at the visitor after catching the clip (about 2.5 swings)
   out: 0.25, // pulls back up out of view
 };
 

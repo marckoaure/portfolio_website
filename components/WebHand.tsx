@@ -47,6 +47,77 @@ const POSES: Record<HandPose, Record<FingerName, number>> = {
   wave: { index: 0.03, middle: 0.04, ring: 0.05, pinky: 0.06 },
 };
 
+// ---------------------------------------------------------------------------
+// Glove material: red, with black web lines drawn by the shader.
+//
+// The lines are not a texture. They are computed per pixel from where that
+// pixel sits on the UN-POSED model (`position`, before the bones move it), so
+// the pattern is glued to the skin and bends with the fingers.
+//
+// Pattern: evenly spaced lines running along the hand, plus cross "rungs"
+// that sag in the middle of each strip, like the scallops of a web.
+//   hand:   strips are counted across the hand (the model's Z axis)
+//   sleeve: strips are counted around the cylinder (by angle)
+// ---------------------------------------------------------------------------
+function makeGloveMaterial(part: "hand" | "sleeve") {
+  const material = new THREE.MeshStandardMaterial({
+    color: "#c4161c",
+    roughness: 0.52,
+    metalness: 0.05,
+  });
+
+  // strip width in metres, and how to count strips for this part
+  const cell = part === "hand" ? "0.0125" : "0.0157";
+  const strips =
+    part === "hand"
+      ? "vWebPos.z / cell"
+      : "atan(vWebPos.z, vWebPos.x) / 6.2831853 * 14.0";
+  // On the hand, a line plane can lie flat against the side of a finger and
+  // smear into a dark band. Fade the lengthwise lines out where the surface
+  // faces sideways.
+  const sideFade =
+    part === "hand" ? "1.0 - smoothstep(0.7, 0.95, abs(vWebNormal.z))" : "1.0";
+
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vWebPos;\nvarying vec3 vWebNormal;"
+      )
+      .replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvWebPos = position;\nvWebNormal = normal;"
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vWebPos;\nvarying vec3 vWebNormal;"
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        {
+          float cell = ${cell};
+          float fu = fract(${strips}) - 0.5;            // -0.5..0.5 across one strip
+          float dLong = (0.5 - abs(fu)) * cell;         // metres to the nearest lengthwise line
+          float sag = (0.25 - fu * fu) * 2.2 * cell;    // rungs dip mid-strip
+          float fv = fract((vWebPos.y + sag) / (cell * 1.2));
+          float dRung = min(fv, 1.0 - fv) * cell * 1.2; // metres to the nearest rung
+          float halfWidth = 0.0008;                     // line half-width, metres
+          float aaLong = clamp(fwidth(dLong), 0.00005, 0.002);
+          float aaRung = clamp(fwidth(dRung), 0.00005, 0.002);
+          float lineLong = (1.0 - smoothstep(halfWidth, halfWidth + aaLong, dLong)) * (${sideFade});
+          float lineRung = 1.0 - smoothstep(halfWidth, halfWidth + aaRung, dRung);
+          float web = max(lineLong, lineRung);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.02, 0.02), web * 0.9);
+        }`
+      );
+  };
+  // Two variants of one material class: tell three they compile differently.
+  material.customProgramCacheKey = () => `glove-${part}`;
+  return material;
+}
+
 type Finger = {
   bones: THREE.Object3D[];
   restPos: THREE.Vector3[];
@@ -124,14 +195,12 @@ function Rig({ pose, onReady }: { pose: HandPose; onReady?: () => void }) {
   });
 
   const fingers = useMemo(() => buildFingers(gltf.scene), [gltf]);
+  const sleeve = useMemo(() => makeGloveMaterial("sleeve"), []);
+  useEffect(() => () => sleeve.dispose(), [sleeve]);
 
   // One-time setup: glove material, and tell the parent we can be shown.
   useEffect(() => {
-    const glove = new THREE.MeshStandardMaterial({
-      color: "#c4161c",
-      roughness: 0.52,
-      metalness: 0.05,
-    });
+    const glove = makeGloveMaterial("hand");
     gltf.scene.traverse((o) => {
       const mesh = o as THREE.SkinnedMesh;
       if (mesh.isSkinnedMesh) {
@@ -164,8 +233,8 @@ function Rig({ pose, onReady }: { pose: HandPose; onReady?: () => void }) {
     w.amount += (target - w.amount) * (1 - Math.exp(-dt * 9));
     if (pose === "wave") w.time += dt;
     else w.time = 0;
-    const phase = w.time * Math.PI * 2 * 2.3; // 2.3 swings per second
-    if (elbow.current) elbow.current.rotation.z = Math.sin(phase) * 0.1 * w.amount;
+    const phase = w.time * Math.PI * 2 * 1.4; // 1.4 swings per second: unhurried
+    if (elbow.current) elbow.current.rotation.z = Math.sin(phase) * 0.12 * w.amount;
     if (wrist.current) wrist.current.rotation.z = Math.sin(phase - 0.7) * 0.3 * w.amount;
   });
 
@@ -174,9 +243,8 @@ function Rig({ pose, onReady }: { pose: HandPose; onReady?: () => void }) {
     <group ref={elbow} position={[0, 0.5, 0]}>
       <group position={[0, -0.5, 0]}>
         {/* forearm / sleeve, running up out of the top of the frame */}
-        <mesh position={[0.01, 0.305, -0.038]} scale={[1, 1, 0.74]}>
+        <mesh position={[0.01, 0.305, -0.038]} scale={[1, 1, 0.74]} material={sleeve}>
           <cylinderGeometry args={[0.04, 0.031, 0.5, 40]} />
-          <meshStandardMaterial color="#c4161c" roughness={0.52} metalness={0.05} />
         </mesh>
 
         {/* wrist pivot: the hand itself */}
