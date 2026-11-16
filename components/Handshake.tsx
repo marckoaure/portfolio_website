@@ -93,12 +93,20 @@ const rung = (f: number) => {
 const SPLAT_RUNGS = [rung(0.4), rung(0.72)];
 
 // LEFTOVERS: a few loose threads that drift down where the clip used to be.
-const LEFTOVERS = Array.from({ length: 6 }, (_, i) => {
-  const x = -46 + i * 18 + (rand(i, 39.3467) - 0.5) * 10;
-  const len = 12 + rand(i, 93.9898) * 20;
-  const lean = (rand(i, 51.123) - 0.5) * 12;
-  return { x1: x, y1: 0, x2: x + lean, y2: len, o: 0.35 + rand(i, 7.77) * 0.4 };
-});
+// Hand-placed on purpose: evenly spaced, same-angle threads read as tally
+// marks, so each one gets its own length, lean and droop.
+const LEFTOVERS = [
+  { x: -52, len: 16, lean: -7, o: 0.55 },
+  { x: -30, len: 27, lean: 5, o: 0.75 },
+  { x: -11, len: 12, lean: -3, o: 0.45 },
+  { x: 7, len: 31, lean: 9, o: 0.7 },
+  { x: 28, len: 18, lean: -10, o: 0.5 },
+  { x: 49, len: 23, lean: 4, o: 0.65 },
+].map((t) => ({
+  // a quadratic curve: starts straight down, then drifts sideways (droop)
+  d: `M ${t.x} 0 Q ${t.x + t.lean * 0.15} ${t.len * 0.6} ${t.x + t.lean} ${t.len}`,
+  o: t.o,
+}));
 
 // Timeline of the pull, in seconds. One place to tune the feel.
 const PULL = {
@@ -257,17 +265,9 @@ export default function Handshake() {
                   }}
                 >
                   <svg width="1" height="1" className="block overflow-visible">
-                    <g stroke="white" strokeLinecap="round">
+                    <g stroke="white" fill="none" strokeLinecap="round">
                       {LEFTOVERS.map((t, i) => (
-                        <line
-                          key={i}
-                          x1={t.x1}
-                          y1={t.y1}
-                          x2={t.x2}
-                          y2={t.y2}
-                          strokeWidth="0.8"
-                          opacity={t.o}
-                        />
+                        <path key={i} d={t.d} strokeWidth="0.8" opacity={t.o} />
                       ))}
                     </g>
                   </svg>
