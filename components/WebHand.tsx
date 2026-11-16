@@ -54,67 +54,171 @@ const POSES: Record<HandPose, Record<FingerName, number>> = {
 // pixel sits on the UN-POSED model (`position`, before the bones move it), so
 // the pattern is glued to the skin and bends with the fingers.
 //
-// Pattern: evenly spaced lines running along the hand, plus cross "rungs"
-// that sag in the middle of each strip, like the scallops of a web.
-//   hand:   strips are counted across the hand (the model's Z axis)
-//   sleeve: strips are counted around the cylinder (by angle)
+// The pattern copies how the suit's glove is drawn:
+//   SPOKES  one line from the wrist to each knuckle and on down the middle of
+//           that finger, plus one from the wrist into each gap between
+//           fingers (those stop at the knuckles).
+//   ARCS    thin cross lines at even steps away from the wrist. Between two
+//           spokes each arc sags back toward the wrist and meets the spokes
+//           in a point, like the threads of a real web.
+// Everything is measured in the plane of the palm (the model's Y and Z).
 // ---------------------------------------------------------------------------
-function makeGloveMaterial(part: "hand" | "sleeve") {
+
+// Where the spokes go, read from the model's own joints.
+type WebLayout = {
+  wrist: [number, number];
+  knuckles: [number, number][]; // thumb, index, middle, ring, pinky
+  tips: [number, number][]; // a little past each fingertip
+  gaps: [number, number][]; // between neighbouring knuckles
+};
+
+const v2 = (o: THREE.Vector3): [number, number] => [o.y, o.z];
+
+function handWebLayout(
+  scene: THREE.Object3D,
+  fingers: Record<FingerName, Finger>
+): WebLayout {
+  const joint = (name: string) => {
+    const o = scene.getObjectByName(name);
+    if (!o) throw new Error(`hand.glb is missing joint "${name}"`);
+    return o.position;
+  };
+  // The spokes meet a little way up the forearm, hidden under the sleeve.
+  // Meeting exactly at the wrist bunched them into a dark knot on the palm.
+  const w = joint("wrist");
+  const wrist: [number, number] = [w.y + 0.03, w.z];
+  // The thumb is never posed, so its joints still hold their rest positions.
+  const digits: { knuckle: [number, number]; tip: [number, number] }[] = [
+    { knuckle: v2(joint("thumb-metacarpal")), tip: v2(joint("thumb-tip")) },
+    ...FINGERS.map((name) => ({
+      knuckle: v2(fingers[name].restPos[1]),
+      tip: v2(fingers[name].restPos[4]),
+    })),
+  ];
+  const knuckles = digits.map((d) => d.knuckle);
+  const tips = digits.map((d): [number, number] => {
+    const dy = d.tip[0] - d.knuckle[0];
+    const dz = d.tip[1] - d.knuckle[1];
+    const len = Math.hypot(dy, dz);
+    const reach = (len + 0.03) / len; // run past the fingertip
+    return [d.knuckle[0] + dy * reach, d.knuckle[1] + dz * reach];
+  });
+  // A gap spoke ends between two knuckles, pulled a little back to the wrist.
+  const gaps = knuckles.slice(0, -1).map((k, i): [number, number] => {
+    const n = knuckles[i + 1];
+    const pull = i === 0 ? 0.3 : 0.14; // the thumb gap sits further back
+    const my = (k[0] + n[0]) / 2;
+    const mz = (k[1] + n[1]) / 2;
+    return [my + (wrist[0] - my) * pull, mz + (wrist[1] - mz) * pull];
+  });
+  return { wrist, knuckles, tips, gaps };
+}
+
+const glslVec2 = (v: [number, number]) => `vec2(${v[0].toFixed(5)}, ${v[1].toFixed(5)})`;
+const glslArray = (list: [number, number][]) =>
+  `vec2[${list.length}](${list.map(glslVec2).join(", ")})`;
+
+const WEB_INK = "vec3(0.03, 0.02, 0.02)";
+
+// Shader for the hand: spokes along the fingers, arcs sagging between them.
+function handWebShader(layout: WebLayout) {
+  const n = layout.knuckles.length;
+  const g = layout.gaps.length;
+  return {
+    header: `
+      const vec2 WEB_W = ${glslVec2(layout.wrist)};
+      const vec2 WEB_K[${n}] = ${glslArray(layout.knuckles)};
+      const vec2 WEB_T[${n}] = ${glslArray(layout.tips)};
+      const vec2 WEB_G[${g}] = ${glslArray(layout.gaps)};
+      // distance from point p to the segment a-b
+      float webSeg(vec2 p, vec2 a, vec2 b) {
+        vec2 pa = p - a;
+        vec2 ba = b - a;
+        float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+        return length(pa - ba * h);
+      }`,
+    body: `
+      {
+        vec2 p = vWebPos.yz;
+        float d1 = 1.0;       // distance to the nearest spoke
+        float d2 = 1.0;       // ... and to the second nearest
+        float dDigit = 1.0;   // nearest FINGER spoke
+        float alongFinger = 0.0;
+        for (int i = 0; i < ${n}; i++) {
+          float d = min(webSeg(p, WEB_W, WEB_K[i]), webSeg(p, WEB_K[i], WEB_T[i]));
+          if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+          if (d < dDigit) {
+            dDigit = d;
+            vec2 dir = normalize(WEB_T[i] - WEB_K[i]);
+            alongFinger = length(WEB_K[i] - WEB_W) + dot(p - WEB_K[i], dir);
+          }
+        }
+        for (int j = 0; j < ${g}; j++) {
+          float d = webSeg(p, WEB_W, WEB_G[j]);
+          if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+        }
+        // How far this point is from the wrist: straight-line on the palm,
+        // measured along the finger once past the knuckle.
+        float reach = max(length(p - WEB_W), alongFinger);
+        // 0 on a spoke, 0.5 midway to the next one.
+        float t = d1 / max(d1 + d2, 0.00001);
+        // The arc sags toward the wrist between spokes: steep at the spoke
+        // (a point), flat in the middle.
+        float sag = 4.0 * t * (1.0 - t) * min(0.3 * (d1 + d2), 0.0075);
+        float step = 0.0165;
+        float fv = fract((reach + sag) / step);
+        float dArc = min(fv, 1.0 - fv) * step;
+        float aaSpoke = clamp(fwidth(d1), 0.00005, 0.002);
+        float aaArc = clamp(fwidth(dArc), 0.00005, 0.002);
+        float spoke = 1.0 - smoothstep(0.00085, 0.00085 + aaSpoke, d1);
+        float arc = 1.0 - smoothstep(0.00050, 0.00050 + aaArc, dArc);
+        diffuseColor.rgb = mix(diffuseColor.rgb, ${WEB_INK}, max(spoke, arc) * 0.93);
+      }`,
+  };
+}
+
+// Shader for the sleeve: the same idea wrapped round a cylinder. Ten
+// lengthwise lines, and arcs that sag toward the elbow so they line up in
+// spirit with the arcs on the hand (both sag away from the fingertips).
+function sleeveWebShader() {
+  return {
+    header: "",
+    body: `
+      {
+        float strips = 10.0;
+        float width = 0.0215;                           // metres between lines
+        float fu = fract(atan(vWebPos.z, vWebPos.x) / 6.2831853 * strips);
+        float t = min(fu, 1.0 - fu);                    // 0 on a line, 0.5 midway
+        float dLine = t * width;
+        float sag = 4.0 * t * (1.0 - t) * 0.006;
+        float step = 0.0165;
+        float fv = fract((vWebPos.y - sag) / step);
+        float dArc = min(fv, 1.0 - fv) * step;
+        float aaLine = clamp(fwidth(dLine), 0.00005, 0.002);
+        float aaArc = clamp(fwidth(dArc), 0.00005, 0.002);
+        float line = 1.0 - smoothstep(0.00085, 0.00085 + aaLine, dLine);
+        float arc = 1.0 - smoothstep(0.00050, 0.00050 + aaArc, dArc);
+        diffuseColor.rgb = mix(diffuseColor.rgb, ${WEB_INK}, max(line, arc) * 0.93);
+      }`,
+  };
+}
+
+function makeGloveMaterial(web: { header: string; body: string }, key: string) {
   const material = new THREE.MeshStandardMaterial({
     color: "#c4161c",
     roughness: 0.52,
     metalness: 0.05,
   });
-
-  // strip width in metres, and how to count strips for this part
-  const cell = part === "hand" ? "0.0125" : "0.0157";
-  const strips =
-    part === "hand"
-      ? "vWebPos.z / cell"
-      : "atan(vWebPos.z, vWebPos.x) / 6.2831853 * 14.0";
-  // On the hand, a line plane can lie flat against the side of a finger and
-  // smear into a dark band. Fade the lengthwise lines out where the surface
-  // faces sideways.
-  const sideFade =
-    part === "hand" ? "1.0 - smoothstep(0.7, 0.95, abs(vWebNormal.z))" : "1.0";
-
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nvarying vec3 vWebPos;\nvarying vec3 vWebNormal;"
-      )
-      .replace(
-        "#include <begin_vertex>",
-        "#include <begin_vertex>\nvWebPos = position;\nvWebNormal = normal;"
-      );
+      .replace("#include <common>", "#include <common>\nvarying vec3 vWebPos;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWebPos = position;");
     shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nvarying vec3 vWebPos;\nvarying vec3 vWebNormal;"
-      )
-      .replace(
-        "#include <color_fragment>",
-        `#include <color_fragment>
-        {
-          float cell = ${cell};
-          float fu = fract(${strips}) - 0.5;            // -0.5..0.5 across one strip
-          float dLong = (0.5 - abs(fu)) * cell;         // metres to the nearest lengthwise line
-          float sag = (0.25 - fu * fu) * 2.2 * cell;    // rungs dip mid-strip
-          float fv = fract((vWebPos.y + sag) / (cell * 1.2));
-          float dRung = min(fv, 1.0 - fv) * cell * 1.2; // metres to the nearest rung
-          float halfWidth = 0.0008;                     // line half-width, metres
-          float aaLong = clamp(fwidth(dLong), 0.00005, 0.002);
-          float aaRung = clamp(fwidth(dRung), 0.00005, 0.002);
-          float lineLong = (1.0 - smoothstep(halfWidth, halfWidth + aaLong, dLong)) * (${sideFade});
-          float lineRung = 1.0 - smoothstep(halfWidth, halfWidth + aaRung, dRung);
-          float web = max(lineLong, lineRung);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.02, 0.02), web * 0.9);
-        }`
-      );
+      .replace("#include <common>", `#include <common>\nvarying vec3 vWebPos;\n${web.header}`)
+      .replace("#include <color_fragment>", `#include <color_fragment>\n${web.body}`);
   };
   // Two variants of one material class: tell three they compile differently.
-  material.customProgramCacheKey = () => `glove-${part}`;
+  material.customProgramCacheKey = () => `glove-${key}`;
   return material;
 }
 
@@ -195,12 +299,15 @@ function Rig({ pose, onReady }: { pose: HandPose; onReady?: () => void }) {
   });
 
   const fingers = useMemo(() => buildFingers(gltf.scene), [gltf]);
-  const sleeve = useMemo(() => makeGloveMaterial("sleeve"), []);
+  const sleeve = useMemo(() => makeGloveMaterial(sleeveWebShader(), "sleeve"), []);
   useEffect(() => () => sleeve.dispose(), [sleeve]);
 
   // One-time setup: glove material, and tell the parent we can be shown.
   useEffect(() => {
-    const glove = makeGloveMaterial("hand");
+    const glove = makeGloveMaterial(
+      handWebShader(handWebLayout(gltf.scene, fingers)),
+      "hand"
+    );
     gltf.scene.traverse((o) => {
       const mesh = o as THREE.SkinnedMesh;
       if (mesh.isSkinnedMesh) {
